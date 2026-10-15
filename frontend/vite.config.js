@@ -9,6 +9,11 @@ export default defineConfig({
     target: 'es2020',
     chunkSizeWarningLimit: 900
   },
+  test: {
+    environment: 'jsdom',
+    include: ['tests/**/*.test.js'],
+    globals: true
+  },
   server: {
     port: 5173,
     proxy: {
