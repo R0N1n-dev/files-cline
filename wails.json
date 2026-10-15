@@ -1,0 +1,20 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "vela-files",
+  "outputfilename": "vela-files",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Vela Files Engineering",
+    "email": "dev@vela.local"
+  },
+  "info": {
+    "companyName": "Vela Files",
+    "productName": "Vela Files",
+    "productVersion": "2.4.0",
+    "copyright": "Copyright 2026",
+    "comments": "Nautilus-inspired Linux File Manager built with Wails v2, Vue 3, and Go stdlib"
+  }
+}

@@ -1,0 +1,17 @@
+# Binaries & Build Outputs
+build/bin/
+dist/
+frontend/dist/
+frontend/node_modules/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Local environment / caches
+.cline-home/
+.DS_Store
+Thumbs.db
