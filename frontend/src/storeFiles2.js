@@ -55,6 +55,7 @@ export async function copySelection(cut = false) {
   if (!paths.length) return
   internalClipboard.paths = paths
   internalClipboard.cut = cut
+  state.clipboardCut = cut ? [...paths] : []
   try {
     await backend.CopyToClipboard(paths, cut)
     toast(`${cut ? 'Cut' : 'Copied'} ${paths.length} item(s) — paste into any Linux app`, 'success')

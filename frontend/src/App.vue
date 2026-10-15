@@ -61,7 +61,7 @@ import QuickLook from './components/QuickLook.vue'
 import DragShelf from './components/DragShelf.vue'
 import ToastHost from './components/ToastHost.vue'
 import { state, totalSelectedSize, persist } from './store'
-import { goBack, goForward, toggleHidden } from './storeNav'
+import { goBack, goForward, toggleHidden, setDropTargetResolver } from './storeNav'
 import { toggleInspector, quickLook } from './storeOps'
 import { openPrompt } from './prompt'
 import { targetPaths, trashPaths, duplicateSelection, openPaths, createFolder } from './storeFiles'
@@ -147,6 +147,10 @@ function onWindowContextMenu(e) {
 }
 
 onMounted(() => {
+  setDropTargetResolver((x, y) => {
+    const view = primaryView.value
+    return view && view.hitTest ? view.hitTest(x, y) : null
+  })
   window.addEventListener('click', closeFloating)
   window.addEventListener('vela:rename', onRenameRequest)
   window.addEventListener('vela:new-folder', onNewFolderRequest)

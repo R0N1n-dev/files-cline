@@ -41,6 +41,7 @@ export const state = reactive({
   paletteOpen: false,
   contextMenu: null,
   dropActive: false,
+  clipboardCut: [],
   dragShelf: [],
   splitView: false,
   secondary: { cwd: '', entries: [], breadcrumbs: [], totalCount: 0 },

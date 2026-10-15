@@ -2,6 +2,15 @@ import { state, fail, persist, applyConfig, applyTheme, toast } from './store'
 import { backend, onEvent } from './api'
 import { demoListing, demoSidebar, demoOperations, demoConfig } from './demo'
 
+// Lets the shell resolve which folder an OS-level drop landed on.
+let dropTargetResolver = null
+export function setDropTargetResolver(fn) {
+  dropTargetResolver = fn
+}
+export function resolveDropTarget(x, y) {
+  return dropTargetResolver ? dropTargetResolver(x, y) : null
+}
+
 /* -------------------------------------------------------------- navigation */
 
 export async function navigate(path, options = {}) {
@@ -199,7 +208,8 @@ function bindEvents() {
   onEvent('drop:received', (payload) => {
     state.dropActive = false
     if (payload && payload.paths && payload.paths.length) {
-      import('./storeFiles').then((m) => m.handleDrop(payload.paths, state.cwd, false))
+      const hovered = resolveDropTarget(payload.x, payload.y)
+      import('./storeFiles2').then((m) => m.handleDrop(payload.paths, hovered || state.cwd, false))
     }
   })
 }

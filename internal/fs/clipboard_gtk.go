@@ -3,6 +3,7 @@ package fs
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -109,9 +110,14 @@ Gtk.main()
 `)
 }
 
+/* ------------------------------------------------------- native integrations */
+
+// HelperBinaryName is the optional native drag/clipboard helper executable.
+const helperBinaryName = "vela-dnd-helper"
+
 // StartNativeDrag opens a native drag source window for outbound drag-and-drop.
-// WebKit2GTK cannot start OS-level drags from a webview, so Vela Files hands the
-// selection to a native GTK drag source (or dragon-drop when available).
+// WebKit2GTK cannot start OS-level drags from a webview, so the selection is
+// handed to the bundled helper (preferred), dragon-drop, or an inline GTK source.
 func StartNativeDrag(paths []string) error {
 	if len(paths) == 0 {
 		return os.ErrInvalid
@@ -119,6 +125,15 @@ func StartNativeDrag(paths []string) error {
 	abs := make([]string, 0, len(paths))
 	for _, p := range paths {
 		abs = append(abs, ExpandPath(p))
+	}
+
+	if helper := HelperBinaryPath(); helper != "" {
+		cmd := exec.Command(helper, append([]string{"drag"}, abs...)...)
+		cmd.Env = os.Environ()
+		if err := cmd.Start(); err == nil {
+			go func() { _ = cmd.Wait() }()
+			return nil
+		}
 	}
 
 	if dragon, err := exec.LookPath("dragon-drop"); err == nil {
@@ -149,7 +164,8 @@ func StartNativeDrag(paths []string) error {
 	return nil
 }
 
-// HelperBinaryPath locates the optional vela-dnd-helper executable.
+// HelperBinaryPath locates the optional vela-dnd-helper executable: an explicit
+// VELA_DND_HELPER override, next to the running binary, or on $PATH.
 func HelperBinaryPath() string {
 	if explicit := os.Getenv("VELA_DND_HELPER"); explicit != "" {
 		if _, err := os.Stat(explicit); err == nil {
@@ -157,21 +173,13 @@ func HelperBinaryPath() string {
 		}
 	}
 	if exe, err := os.Executable(); err == nil {
-		candidate := filepathJoinDir(exe, "vela-dnd-helper")
+		candidate := filepath.Join(filepath.Dir(exe), helperBinaryName)
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate
 		}
 	}
-	if path, err := exec.LookPath("vela-dnd-helper"); err == nil {
+	if path, err := exec.LookPath(helperBinaryName); err == nil {
 		return path
 	}
 	return ""
-}
-
-func filepathJoinDir(exePath, name string) string {
-	idx := strings.LastIndex(exePath, "/")
-	if idx < 0 {
-		return name
-	}
-	return exePath[:idx+1] + name
 }

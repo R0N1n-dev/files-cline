@@ -443,6 +443,35 @@ function onBlankContextMenu(e) {
   emit('context-menu', { x: e.clientX, y: e.clientY, entry: null })
 }
 
+/* --------------------------------------------------------------- hit testing */
+
+/**
+ * hitTest resolves the folder entry under a viewport coordinate. Used for
+ * OS-level drops reported by the Go side (which arrive with window x/y, not a
+ * DOM target), so dropping onto a folder tile moves/copies into that folder.
+ */
+function hitTest(clientX, clientY) {
+  const el = scrollEl.value
+  if (!el) return null
+  const rect = el.getBoundingClientRect()
+  if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+    return null
+  }
+  const x = clientX - rect.left
+  const y = clientY - rect.top + el.scrollTop
+
+  for (let i = 0; i < items.value.length; i++) {
+    const r = itemRect(i)
+    if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
+      const entry = items.value[i]
+      return entry && entry.isDir ? entry.path : null
+    }
+  }
+  return null
+}
+
+defineExpose({ startRename, scrollEl, hitTest })
+
 /* ---------------------------------------------------------- drag and drop */
 
 function onDragOver(e) {
@@ -621,6 +650,4 @@ watch(() => state.listing.path, () => {
 })
 
 watch(() => items.value.length, () => queueVisibleThumbnails())
-
-defineExpose({ startRename, scrollEl })
 </script>
