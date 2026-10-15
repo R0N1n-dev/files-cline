@@ -89,6 +89,22 @@ body {
   user-select: none;
 }
 
+/*
+ * Base icon sizing. Loaded before the component stylesheets so that
+ * context-specific rules (.icon-btn svg, .place svg, .menu-item svg, ...)
+ * win by source order at equal specificity.
+ */
+svg.vela-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 button {
   font: inherit;
   color: inherit;

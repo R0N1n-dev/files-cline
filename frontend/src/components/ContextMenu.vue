@@ -44,16 +44,16 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import Icon from './Icon.vue'
-import { state } from '../store'
+import { state, entriesOf } from '../store'
 import { openPrompt } from '../prompt'
 import {
   openPaths, trashPaths, deletePermanently, restoreSelection, deleteTrashSelection,
-  emptyTrash, duplicateSelection, chmodSelection, targetPaths,
+  emptyTrash, duplicateSelection, chmodSelection, targetPaths, targetDir,
   createFolder, createFile
 } from '../storeFiles'
 import {
   stageOutboundDrag, compressSelection, extractSelection, copySelection, pasteInto,
-  showInNativeFileManager, openTerminal
+  showInNativeFileManager, openTerminal, transferToOtherPane
 } from '../storeFiles2'
 import { openWithMenu, quickLook, toggleInspector } from '../storeOps'
 import { toggleHidden as toggleHiddenFiles, setSort } from '../storeNav'
@@ -76,6 +76,9 @@ const menuStyle = computed(() => {
 })
 
 const isTrashView = computed(() => state.listing.isTrashView)
+const canTransfer = computed(() =>
+  state.splitView && !!state.secondary.cwd && (state.selection.length > 0 || state.secondary.selection.length > 0)
+)
 const isArchive = computed(() => {
   const e = props.menu && props.menu.entry
   return !!e && /\.(zip|tar|tar\.gz|tgz)$/i.test(e.name)
@@ -103,26 +106,27 @@ function compressAction() {
     label: 'Archive name (.zip, .tar, .tar.gz)',
     value: `${first}.zip`,
     confirmLabel: 'Create',
-    onSubmit: (name) => compressSelection(`${state.cwd}/${name}`)
+    onSubmit: (name) => compressSelection(`${targetDir()}/${name}`)
   })
 }
 
 function newFolder() {
   openPrompt({
     title: 'New folder', label: 'Folder name', value: 'New Folder', confirmLabel: 'Create',
-    onSubmit: (name) => createFolder(state.cwd, name)
+    onSubmit: (name) => createFolder(targetDir(), name)
   })
 }
 
 function newFile() {
   openPrompt({
     title: 'New file', label: 'File name', value: 'untitled.txt', confirmLabel: 'Create',
-    onSubmit: (name) => createFile(state.cwd, name, '')
+    onSubmit: (name) => createFile(targetDir(), name, '')
   })
 }
 
 function selectAll() {
-  state.selection = state.listing.entries.map((e) => e.path)
+  state.selection = entriesOf().map((e) => e.path)
+  if (state.activePane === 'secondary') state.secondary.selection = state.selection
 }
 
 function toggleHidden() {
@@ -144,7 +148,7 @@ function buildItems() {
       { label: 'This folder' },
       { text: 'New Folder…', icon: 'folderPlus', shortcut: 'Ctrl+Shift+N', action: newFolder },
       { text: 'New File…', icon: 'filePlus', action: newFile },
-      { text: 'Paste', icon: 'paste', shortcut: 'Ctrl+V', action: () => pasteInto(state.cwd) },
+      { text: 'Paste', icon: 'paste', shortcut: 'Ctrl+V', action: () => pasteInto(targetDir()) },
       { sep: true },
       { text: 'Select All', icon: 'check', shortcut: 'Ctrl+A', action: selectAll },
       {
@@ -157,10 +161,10 @@ function buildItems() {
       { text: `Modified${sortMark('modified')}`, icon: 'clock', action: () => setSort('modified') },
       { text: `Type${sortMark('type')}`, icon: 'sort', action: () => setSort('type') },
       { sep: true },
-      { text: 'Open in Terminal', icon: 'terminal', action: () => openTerminal(state.cwd) },
+      { text: 'Open in Terminal', icon: 'terminal', action: () => openTerminal(targetDir()) },
       {
         text: 'Open in Native File Manager', icon: 'external',
-        action: () => showInNativeFileManager([state.cwd])
+        action: () => showInNativeFileManager([targetDir()])
       },
       { sep: true },
       { text: 'Empty Trash', icon: 'trash', danger: true, action: () => emptyTrash() }
@@ -196,7 +200,13 @@ function buildItems() {
     list.push({ text: 'Batch Rename…', icon: 'rename', action: () => { state.batchRenameOpen = true } })
   }
   if (isArchive.value) {
-    list.push({ text: 'Extract Here', icon: 'extract', action: () => extractSelection(state.cwd) })
+    list.push({ text: 'Extract Here', icon: 'extract', action: () => extractSelection(targetDir()) })
+  }
+  if (canTransfer.value) {
+    list.push(
+      { text: 'Copy to Other Pane', icon: 'copy', shortcut: 'F5', action: () => transferToOtherPane(false) },
+      { text: 'Move to Other Pane', icon: 'cut', shortcut: 'F6', action: () => transferToOtherPane(true) }
+    )
   }
 
   list.push(

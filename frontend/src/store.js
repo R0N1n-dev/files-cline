@@ -44,7 +44,11 @@ export const state = reactive({
   clipboardCut: [],
   dragShelf: [],
   splitView: false,
-  secondary: { cwd: '', entries: [], breadcrumbs: [], totalCount: 0 },
+  activePane: 'primary',
+  secondary: {
+    cwd: '', entries: [], breadcrumbs: [], parentPath: '', totalCount: 0, totalSize: 0,
+    diskFree: 0, diskTotal: 0, diskUsedPercent: 0, isTrashView: false, selection: [], lastAnchor: -1
+  },
   secondaryActive: false,
   searchMode: false,
   searchResults: [],
@@ -53,8 +57,29 @@ export const state = reactive({
   gridColumns: 6
 })
 
+/** Path of the pane that currently has focus. */
+export function activeCwd() {
+  return state.activePane === 'secondary' && state.splitView ? state.secondary.cwd : state.cwd
+}
+
+/** Selection of the pane that currently has focus. */
+export function activeSelection() {
+  return state.activePane === 'secondary' && state.splitView ? state.secondary.selection : state.selection
+}
+
+/** Entries of a pane (defaults to the active one). */
+export function entriesOf(pane) {
+  const which = pane || state.activePane
+  return which === 'secondary' ? state.secondary.entries : state.listing.entries
+}
+
+export function selectionOf(pane) {
+  const which = pane || state.activePane
+  return which === 'secondary' ? state.secondary.selection : state.selection
+}
+
 export const selectedEntries = computed(() =>
-  state.listing.entries.filter((e) => state.selection.includes(e.path))
+  entriesOf().filter((e) => selectionOf().includes(e.path))
 )
 
 export const totalSelectedSize = computed(() =>
@@ -76,8 +101,8 @@ export const currentBreadcrumbs = computed(() =>
     : [{ name: '/', path: '/' }]
 )
 
-export function isSelected(path) {
-  return state.selection.includes(path)
+export function isSelected(path, pane) {
+  return selectionOf(pane).includes(path)
 }
 
 export function fail(err) {

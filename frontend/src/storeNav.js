@@ -18,6 +18,7 @@ export async function navigate(path, options = {}) {
   state.loading = true
   state.error = ''
   state.searchMode = false
+  setActivePane('primary')
   try {
     const listing = state.demoMode
       ? demoListing(path)
@@ -110,39 +111,143 @@ export function setIconSize(size) {
 
 /* ---------------------------------------------------------------- selection */
 
-export function setSelection(paths) {
-  state.selection = [...new Set(paths)]
+// All selection helpers accept an optional pane ('primary' | 'secondary').
+// Omitting it targets the active pane, which keeps the shell code simple.
+function paneIsSecondary(pane) {
+  const which = pane || state.activePane
+  return which === 'secondary' && state.splitView
 }
 
-export function toggleSelection(path, index = -1) {
-  if (state.selection.includes(path)) {
-    state.selection = state.selection.filter((p) => p !== path)
-  } else {
-    state.selection = [...state.selection, path]
-  }
-  if (index >= 0) state.lastAnchor = index
+function readSelection(pane) {
+  return paneIsSecondary(pane) ? state.secondary.selection : state.selection
 }
 
-export function rangeSelect(index) {
-  const entries = state.listing.entries
-  const anchor = state.lastAnchor >= 0 ? state.lastAnchor : 0
+function writeSelection(pane, value) {
+  if (paneIsSecondary(pane)) state.secondary.selection = value
+  else state.selection = value
+}
+
+function writeAnchor(pane, index) {
+  if (paneIsSecondary(pane)) state.secondary.lastAnchor = index
+  else state.lastAnchor = index
+}
+
+function readAnchor(pane) {
+  return paneIsSecondary(pane) ? state.secondary.lastAnchor : state.lastAnchor
+}
+
+export function setSelection(paths, pane) {
+  writeSelection(pane, [...new Set(paths)])
+}
+
+export function toggleSelection(path, index = -1, pane) {
+  const current = readSelection(pane)
+  writeSelection(pane, current.includes(path) ? current.filter((p) => p !== path) : [...current, path])
+  if (index >= 0) writeAnchor(pane, index)
+}
+
+export function rangeSelect(index, pane) {
+  const entries = paneIsSecondary(pane) ? state.secondary.entries : state.listing.entries
+  const anchor = readAnchor(pane) >= 0 ? readAnchor(pane) : 0
   const [from, to] = anchor <= index ? [anchor, index] : [index, anchor]
   const range = entries.slice(from, to + 1).map((e) => e.path)
-  state.selection = [...new Set([...state.selection, ...range])]
+  writeSelection(pane, [...new Set([...readSelection(pane), ...range])])
 }
 
-export function selectAll() {
-  state.selection = state.listing.entries.map((e) => e.path)
+export function selectAll(pane) {
+  const entries = paneIsSecondary(pane) ? state.secondary.entries : state.listing.entries
+  writeSelection(pane, entries.map((e) => e.path))
 }
 
-export function clearSelection() {
-  state.selection = []
-  state.lastAnchor = -1
+export function clearSelection(pane) {
+  writeSelection(pane, [])
+  writeAnchor(pane, -1)
 }
 
-export function selectOnly(path, index = 0) {
-  state.selection = [path]
-  state.lastAnchor = index
+export function selectOnly(path, index = 0, pane) {
+  writeSelection(pane, [path])
+  writeAnchor(pane, index)
+}
+
+/* ------------------------------------------------------------ second pane */
+
+export function setActivePane(pane) {
+  state.activePane = pane === 'secondary' ? 'secondary' : 'primary'
+  state.secondaryActive = state.activePane === 'secondary'
+}
+
+function paneFromListing(listing) {
+  return {
+    cwd: listing.path,
+    entries: listing.entries,
+    breadcrumbs: listing.breadcrumbs,
+    parentPath: listing.parentPath,
+    totalCount: listing.totalCount,
+    totalSize: listing.totalSize,
+    diskFree: listing.diskFree,
+    diskTotal: listing.diskTotal,
+    diskUsedPercent: listing.diskUsedPercent,
+    isTrashView: listing.isTrashView
+  }
+}
+
+/** Load a directory into the secondary (split-view) pane. */
+export async function navigateSecondary(path) {
+  if (!path) return
+  state.activePane = 'secondary'
+  state.secondaryActive = true
+  try {
+    const listing = state.demoMode
+      ? demoListing(path)
+      : await backend.ListDirectory(path, state.showHidden, state.sortBy, state.sortDesc, '')
+    if (!listing) throw new Error('Cannot open ' + path)
+    const keep = state.secondary.selection
+    Object.assign(state.secondary, paneFromListing(listing), {
+      selection: keep.filter((p) => listing.entries.some((e) => e.path === p)),
+      lastAnchor: -1
+    })
+    queueVisibleThumbnails(listing.entries)
+  } catch (err) {
+    fail(err)
+  }
+}
+
+export async function goUpSecondary() {
+  if (state.secondary.parentPath) await navigateSecondary(state.secondary.parentPath)
+}
+
+export async function refreshSecondary() {
+  if (!state.secondary.cwd) return
+  try {
+    const listing = state.demoMode
+      ? demoListing(state.secondary.cwd)
+      : await backend.ListDirectory(state.secondary.cwd, state.showHidden, state.sortBy, state.sortDesc, '')
+    Object.assign(state.secondary, paneFromListing(listing))
+  } catch {
+    /* pane may have been closed */
+  }
+}
+
+/** Refresh both panes after a filesystem change. */
+export async function refreshAll() {
+  await refresh()
+  if (state.splitView && state.secondary.cwd) await refreshSecondary()
+}
+
+/** Toggle split view, seeding the second pane next to the current location. */
+export async function toggleSplitView() {
+  state.splitView = !state.splitView
+  persist()
+  if (!state.splitView) {
+    state.activePane = 'primary'
+    state.secondaryActive = false
+    return
+  }
+  if (!state.secondary.cwd) {
+    await navigateSecondary(state.listing.parentPath || state.cwd)
+  } else {
+    state.activePane = 'secondary'
+  }
 }
 
 /* --------------------------------------------------------------- thumbnails */
@@ -151,9 +256,10 @@ export function thumbFor(path) {
   return state.thumbs[path] || null
 }
 
-export function queueVisibleThumbnails() {
+export function queueVisibleThumbnails(entries) {
   if (state.demoMode) return
-  const images = state.listing.entries
+  const list = entries || state.listing.entries
+  const images = list
     .filter((e) => e.category === 'image' && !e.isDir)
     .slice(0, 240)
     .map((e) => e.path)
@@ -194,7 +300,7 @@ function bindEvents() {
     m.upsertOp(op)
     if (op.state === 'completed') toast(op.message || 'Operation completed', 'success')
     if (op.state === 'error') toast(op.error || 'Operation failed', 'error')
-    if (op.kind === 'copy' || op.kind === 'move' || op.kind === 'extract') refresh()
+    if (op.kind === 'copy' || op.kind === 'move' || op.kind === 'extract') refreshAll()
   }))
   onEvent('op:undo', (op) => import('./store').then((m) => m.upsertOp(op)))
   onEvent('op:conflict', (c) => { state.conflict = c })
@@ -204,7 +310,7 @@ function bindEvents() {
   onEvent('trash:changed', () => {
     backend.GetSidebar().then((s) => { state.sidebar = s }).catch(() => {})
   })
-  onEvent('fs:changed', () => refresh())
+  onEvent('fs:changed', () => refreshAll())
   onEvent('drop:received', (payload) => {
     state.dropActive = false
     if (payload && payload.paths && payload.paths.length) {

@@ -25,6 +25,19 @@
   border-left: 1px solid var(--border);
 }
 
+/* Active pane in split view gets a subtle accent so keyboard focus is unambiguous. */
+.split-active .pane.pane-secondary.pane-active {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.split-active .pane.pane-active:not(.pane-secondary) {
+  box-shadow: inset -2px 0 0 var(--accent);
+}
+
+.pane-secondary .view-toolbar {
+  background: var(--bg-sunken);
+}
+
 /* ------------------------------------------------------------------ header */
 
 .headerbar {
@@ -34,10 +47,21 @@
   padding: 0 10px;
   background: var(--bg-header);
   border-bottom: 1px solid var(--border);
+  overflow: hidden;
 }
 
 .headerbar .spacer {
   flex: 1;
+}
+
+.headerbar .searchbox {
+  min-width: 132px;
+  max-width: 260px;
+}
+
+.headerbar svg.vela-icon {
+  width: 17px;
+  height: 17px;
 }
 
 .icon-btn {
@@ -238,14 +262,33 @@
 }
 
 .segmented button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 5px 10px;
   border-radius: 5px;
   color: var(--text-dim);
   font-weight: 600;
 }
 
+.segmented button svg.vela-icon {
+  width: 16px;
+  height: 16px;
+}
+
 .segmented button.active {
   background: var(--bg-elevated);
   color: var(--text);
   box-shadow: var(--shadow-sm);
+}
+
+.btn svg.vela-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.modal-header svg.vela-icon {
+  width: 17px;
+  height: 17px;
 }

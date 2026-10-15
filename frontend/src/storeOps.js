@@ -1,4 +1,4 @@
-import { state, toast, fail, upsertOp } from './store'
+import { state, toast, fail, upsertOp, activeCwd, activeSelection } from './store'
 import { refresh } from './storeNav'
 import { backend } from './api'
 import { targetPaths } from './storeFiles'
@@ -131,8 +131,7 @@ export async function inspectPath(path) {
 export async function toggleInspector() {
   state.inspectorOpen = !state.inspectorOpen
   if (state.inspectorOpen) {
-    const first = state.selection[0] || state.cwd
-    await inspectPath(first)
+    await inspectPath(activeSelection()[0] || activeCwd())
   }
 }
 
@@ -161,7 +160,7 @@ export function closeQuickLook() {
 /* --------------------------------------------------------------- open with */
 
 export async function openWithMenu(path) {
-  const target = path || state.selection[0] || state.cwd
+  const target = path || activeSelection()[0] || activeCwd()
   try {
     const info = await backend.GetAppsForPath(target)
     state.openWith = { ...info, path: target }
@@ -173,7 +172,8 @@ export async function openWithMenu(path) {
 export async function openWithApp(desktopId) {
   const info = state.openWith
   if (!info) return
-  const paths = state.selection.length ? [...state.selection] : [info.path]
+  const selection = activeSelection()
+  const paths = selection.length ? [...selection] : [info.path]
   try {
     await backend.OpenWith(desktopId, paths)
     state.openWith = null

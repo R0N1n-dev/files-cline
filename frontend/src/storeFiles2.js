@@ -1,4 +1,4 @@
-import { state, toast, fail, upsertOp } from './store'
+import { state, toast, fail, upsertOp, activeCwd } from './store'
 import { refresh } from './storeNav'
 import { backend } from './api'
 import { targetPaths } from './storeFiles'
@@ -24,7 +24,7 @@ export async function extractSelection(destDir) {
     return
   }
   try {
-    const id = await backend.ExtractArchive(archives, destDir || state.cwd)
+    const id = await backend.ExtractArchive(archives, destDir || activeCwd())
     toast('Extracting — you can cancel it from the operations ring', 'info')
     const ops = await backend.ListOperations()
     ;(ops || []).forEach(upsertOp)
@@ -39,7 +39,7 @@ export async function extractSelection(destDir) {
 export async function handleDrop(sources, destDir, move = false) {
   if (!sources || !sources.length) return
   try {
-    await backend.HandleDrop(sources, destDir || state.cwd, move)
+    await backend.HandleDrop(sources, destDir || activeCwd(), move)
     toast(`${move ? 'Moving' : 'Copying'} ${sources.length} dropped item(s)…`, 'info')
   } catch (err) {
     fail(err)
@@ -65,7 +65,7 @@ export async function copySelection(cut = false) {
 }
 
 export async function pasteInto(destDir) {
-  const target = destDir || state.cwd
+  const target = destDir || activeCwd()
   let paths = internalClipboard.paths
   let cut = internalClipboard.cut
   let fromSystem = false
@@ -136,9 +136,34 @@ export function clearDragShelf() {
   state.dragShelf = []
 }
 
+/* ------------------------------------------------------- dual-pane transfer */
+
+/**
+ * Copies (or moves) the active pane's selection into the other pane — the
+ * classic dual-pane "F5 / F6" workflow.
+ */
+export async function transferToOtherPane(move = false) {
+  const sources = targetPaths()
+  const dest = state.activePane === 'secondary' ? state.cwd : state.secondary.cwd
+  if (!sources.length) {
+    toast('Nothing selected', 'info')
+    return
+  }
+  if (!dest) {
+    toast('Open a folder in the second pane first', 'info')
+    return
+  }
+  try {
+    await backend[move ? 'Move' : 'Copy'](sources, dest, state.conflictMode)
+    toast(`${move ? 'Moving' : 'Copying'} ${sources.length} item(s) to ${dest}`, 'info')
+  } catch (err) {
+    fail(err)
+  }
+}
+
 export async function addBookmark(path) {
   try {
-    await backend.AddBookmark(path || state.cwd)
+    await backend.AddBookmark(path || activeCwd())
     state.sidebar = await backend.GetSidebar()
     toast('Added to bookmarks', 'success')
   } catch (err) {

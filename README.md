@@ -153,10 +153,20 @@ Optional runtime helpers (each degrades gracefully when absent):
 | `Ctrl+A`, click, `Ctrl`-click, `Shift`-click, drag on empty space | Selection + rubber band |
 | `F2` / `Ctrl+D` | Inline rename / duplicate |
 | `Space` | Quick Look · `Ctrl+I` inspector · `F3` split view |
+| `F5` / `F6` | Copy / move the active selection to the other pane |
 | `Ctrl+C/X/V` | Copy/cut/paste (works with other Linux apps both ways) |
 | `Delete` | Move to Trash (Undo toast) |
 | `Ctrl+H` | Show hidden · `Ctrl+Shift+N` new folder |
 | `Ctrl+K` | Command palette |
+
+## Dual pane
+
+`F3` (or the split button) opens a second, fully independent browser pane. Each pane keeps its own
+path, history-free navigation (up / breadcrumb pill / double-click), selection, scroll position, and
+disk-usage readout. Keyboard focus follows the mouse; the focused pane gets a thin accent edge. Every
+action (context menu, palette, `Delete`, `F2`, paste, compress, batch rename, inspector, Open With)
+targets the **active pane**, and `F5`/`F6` copy or move the active selection straight into the other
+pane — the classic commander-style workflow.
 
 ## Notes & limitations
 

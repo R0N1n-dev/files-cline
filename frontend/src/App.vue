@@ -2,7 +2,7 @@
   <div class="shell" @keydown="onGlobalKey">
     <HeaderBar />
 
-    <div class="shell-body">
+    <div class="shell-body" :class="{ 'split-active': state.splitView }">
       <SidebarPlaces v-if="state.sidebarVisible" />
 
       <VirtualFileView ref="primaryView" @context-menu="onContextMenu">
@@ -24,11 +24,24 @@
 
       <VirtualFileView
         v-if="state.splitView"
-        secondary
-        :entries="state.listing.entries"
-        :cwd="state.cwd"
+        ref="secondaryView"
+        pane="secondary"
         @context-menu="onContextMenu"
-      />
+      >
+        <template #toolbar>
+          <button class="icon-btn" :disabled="!state.secondary.parentPath" title="Up in this pane" @click="goUpSecondary">
+            <Icon name="up" />
+          </button>
+          <button class="icon-btn" title="Refresh this pane" @click="refreshSecondary">
+            <Icon name="undo" />
+          </button>
+          <span class="pill" :title="state.secondary.cwd">{{ secondaryName }}</span>
+          <span v-if="state.secondary.totalCount" class="pill">{{ state.secondary.totalCount }} items</span>
+          <span v-if="canTransferToOtherPane" class="pill warn">
+            {{ state.selection.length }} → copy/move here
+          </span>
+        </template>
+      </VirtualFileView>
 
       <InspectorDrawer />
     </div>
@@ -46,8 +59,9 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import HeaderBar from './components/HeaderBar.vue'
+import Icon from './components/Icon.vue'
 import SidebarPlaces from './components/SidebarPlaces.vue'
 import VirtualFileView from './components/VirtualFileView.vue'
 import InspectorDrawer from './components/InspectorDrawer.vue'
@@ -60,15 +74,36 @@ import PromptModal from './components/PromptModal.vue'
 import QuickLook from './components/QuickLook.vue'
 import DragShelf from './components/DragShelf.vue'
 import ToastHost from './components/ToastHost.vue'
-import { state, totalSelectedSize, persist } from './store'
-import { goBack, goForward, toggleHidden, setDropTargetResolver } from './storeNav'
+import { state, totalSelectedSize, persist, activeCwd, activeSelection } from './store'
+import {
+  goBack, goForward, toggleHidden, setDropTargetResolver, goUpSecondary,
+  refreshSecondary, toggleSplitView
+} from './storeNav'
 import { toggleInspector, quickLook } from './storeOps'
 import { openPrompt } from './prompt'
-import { targetPaths, trashPaths, duplicateSelection, openPaths, createFolder } from './storeFiles'
-import { copySelection, pasteInto } from './storeFiles2'
+import {
+  targetPaths, trashPaths, duplicateSelection, openPaths, createFolder, createFile
+} from './storeFiles'
+import { copySelection, pasteInto, transferToOtherPane } from './storeFiles2'
 import { formatSize } from './utils/format'
 
 const primaryView = ref(null)
+const secondaryView = ref(null)
+
+const secondaryName = computed(() => {
+  const path = state.secondary.cwd || ''
+  return path.split('/').filter(Boolean).pop() || '/'
+})
+
+const canTransferToOtherPane = computed(() =>
+  state.splitView && !!state.secondary.cwd && state.selection.length > 0
+)
+
+/** The view that currently owns the keyboard focus. */
+function activeView() {
+  if (state.splitView && state.activePane === 'secondary') return secondaryView.value
+  return primaryView.value
+}
 
 function onContextMenu(payload) {
   state.contextMenu = payload
@@ -79,7 +114,8 @@ function closeFloating() {
 }
 
 function onRenameRequest(e) {
-  primaryView.value && primaryView.value.startRename(e.detail)
+  const view = activeView()
+  if (view && view.startRename) view.startRename(e.detail)
 }
 
 function onNewFolderRequest() {
@@ -88,7 +124,17 @@ function onNewFolderRequest() {
     label: 'Folder name',
     value: 'New Folder',
     confirmLabel: 'Create',
-    onSubmit: (name) => createFolder(state.cwd, name)
+    onSubmit: (name) => createFolder(activeCwd(), name)
+  })
+}
+
+function onNewFileRequest() {
+  openPrompt({
+    title: 'New file',
+    label: 'File name',
+    value: 'untitled.txt',
+    confirmLabel: 'Create',
+    onSubmit: (name) => createFile(activeCwd(), name, '')
   })
 }
 
@@ -119,25 +165,26 @@ function onGlobalKey(e) {
   if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSelection(); return }
   if (mod && e.key.toLowerCase() === 'c') { e.preventDefault(); copySelection(false); return }
   if (mod && e.key.toLowerCase() === 'x') { e.preventDefault(); copySelection(true); return }
-  if (mod && e.key.toLowerCase() === 'v') { e.preventDefault(); pasteInto(state.cwd); return }
+  if (mod && e.key.toLowerCase() === 'v') { e.preventDefault(); pasteInto(activeCwd()); return }
   if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); goBack(); return }
   if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); goForward(); return }
-  if (e.key === 'F3') {
+  if (e.key === 'F3') { e.preventDefault(); toggleSplitView(); return }
+  if (e.key === 'F5') { e.preventDefault(); transferToOtherPane(false); return }
+  if (e.key === 'F6') { e.preventDefault(); transferToOtherPane(true); return }
+  if (e.key === 'Delete' && activeSelection().length) {
     e.preventDefault()
-    state.splitView = !state.splitView
-    persist()
+    trashPaths(targetPaths())
     return
   }
-  if (e.key === 'Delete' && state.selection.length) { e.preventDefault(); trashPaths(targetPaths()); return }
-  if (e.key === 'F2' && state.selection.length) {
+  if (e.key === 'F2' && activeSelection().length) {
     e.preventDefault()
-    onRenameRequest({ detail: state.selection[0] })
+    onRenameRequest({ detail: activeSelection()[0] })
     return
   }
-  if (e.key === ' ' && state.selection.length) { e.preventDefault(); quickLook(state.selection[0]); return }
-  if (e.key === 'Enter' && state.selection.length === 1) {
+  if (e.key === ' ' && activeSelection().length) { e.preventDefault(); quickLook(activeSelection()[0]); return }
+  if (e.key === 'Enter' && activeSelection().length === 1) {
     e.preventDefault()
-    const entry = state.listing.entries.find((x) => x.path === state.selection[0])
+    const entry = state.listing.entries.find((x) => x.path === activeSelection()[0])
     if (entry && !entry.isDir) openPaths([entry.path])
   }
 }
@@ -148,8 +195,13 @@ function onWindowContextMenu(e) {
 
 onMounted(() => {
   setDropTargetResolver((x, y) => {
-    const view = primaryView.value
-    return view && view.hitTest ? view.hitTest(x, y) : null
+    const views = [primaryView.value, state.splitView ? secondaryView.value : null]
+    for (const view of views) {
+      if (!view || !view.hitTest) continue
+      const hit = view.hitTest(x, y)
+      if (hit) return hit
+    }
+    return null
   })
   window.addEventListener('click', closeFloating)
   window.addEventListener('vela:rename', onRenameRequest)

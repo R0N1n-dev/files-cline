@@ -1,5 +1,17 @@
 <template>
-  <svg viewBox="0 0 24 24" aria-hidden="true">
+  <!--
+    Every icon carries an explicit size plus the .vela-icon class: an <svg> with
+    only a viewBox falls back to the CSS default of 300x150, which would blow up
+    any container that has no dedicated sizing rule (e.g. the view-mode toggle).
+  -->
+  <svg
+    class="vela-icon"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    focusable="false"
+    aria-hidden="true"
+  >
     <path :d="path" />
   </svg>
 </template>

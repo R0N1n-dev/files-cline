@@ -170,6 +170,17 @@ pre.preview {
   gap: 8px;
 }
 
+.volume-head svg.vela-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-dim);
+}
+
+.place svg.vela-icon {
+  width: 17px;
+  height: 17px;
+}
+
 .volume-head .label {
   flex: 1;
   overflow: hidden;

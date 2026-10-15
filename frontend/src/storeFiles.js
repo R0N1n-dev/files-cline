@@ -1,13 +1,22 @@
-import { state, toast, fail, upsertOp, selectedEntries } from './store'
+import { state, toast, fail, upsertOp, selectedEntries, activeCwd } from './store'
 import { navigate, refresh } from './storeNav'
 import { backend } from './api'
 
 /** Internal clipboard used when the system clipboard is unavailable. */
 const internalClipboard = { paths: [], cut: false, active: false }
 
+/** Paths the current action should target: explicit, else the active pane's selection. */
 export function targetPaths(explicit) {
   if (explicit && explicit.length) return explicit
-  return state.selection.length ? [...state.selection] : []
+  const selection = state.activePane === 'secondary' && state.splitView
+    ? state.secondary.selection
+    : state.selection
+  return selection.length ? [...selection] : []
+}
+
+/** Folder new items should be created in (the active pane). */
+export function targetDir() {
+  return activeCwd()
 }
 
 /* ------------------------------------------------------------ open / activate */
@@ -33,8 +42,8 @@ export async function openPaths(paths) {
 
 export async function createFolder(parent, name) {
   try {
-    await backend.CreateFolder(parent || state.cwd, name)
-    await refresh()
+    await backend.CreateFolder(parent || targetDir(), name)
+    await refreshAllPanes()
     toast('Folder created', 'success')
   } catch (err) {
     fail(err)
@@ -43,8 +52,8 @@ export async function createFolder(parent, name) {
 
 export async function createFile(parent, name, content = '') {
   try {
-    await backend.CreateFile(parent || state.cwd, name, content)
-    await refresh()
+    await backend.CreateFile(parent || targetDir(), name, content)
+    await refreshAllPanes()
     toast('File created', 'success')
   } catch (err) {
     fail(err)
@@ -54,7 +63,7 @@ export async function createFile(parent, name, content = '') {
 export async function renameEntry(path, newName) {
   try {
     await backend.Rename(path, newName)
-    await refresh()
+    await refreshAllPanes()
   } catch (err) {
     fail(err)
   }
@@ -64,11 +73,17 @@ export async function applyBatchRename(pairs) {
   try {
     await backend.BatchRename(pairs)
     state.batchRenameOpen = false
-    await refresh()
+    await refreshAllPanes()
     toast(`Renamed ${pairs.length} item(s)`, 'success')
   } catch (err) {
     fail(err)
   }
+}
+
+/** Refreshes every open pane after a mutation. */
+async function refreshAllPanes() {
+  const mod = await import('./storeNav')
+  await mod.refreshAll()
 }
 
 export async function duplicateSelection() {

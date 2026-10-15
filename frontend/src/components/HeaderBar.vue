@@ -68,7 +68,6 @@
     <button class="icon-btn" :class="{ active: state.splitView }" title="Split view (F3)" @click="toggleSplit">
       <Icon name="split" />
     </button>
-
     <button class="icon-btn" :class="{ active: state.inspectorOpen }" title="Inspector (Ctrl+I)" @click="toggleInspector">
       <Icon name="info" />
     </button>
@@ -84,6 +83,9 @@
     <button class="icon-btn" title="New folder (Ctrl+Shift+N)" @click="newFolder">
       <Icon name="folderPlus" />
     </button>
+    <button class="icon-btn" title="New empty file" @click="newFile">
+      <Icon name="filePlus" />
+    </button>
   </header>
 </template>
 
@@ -91,8 +93,8 @@
 import { computed, nextTick, ref } from 'vue'
 import Icon from './Icon.vue'
 import OperationsPopover from './OperationsPopover.vue'
-import { state, setTheme, currentBreadcrumbs } from '../store'
-import { goBack, goForward, goUp, navigate, setViewMode, toggleHidden } from '../storeNav'
+import { state, setTheme, currentBreadcrumbs, activeCwd } from '../store'
+import { goBack, goForward, goUp, navigate, setViewMode, toggleHidden, toggleSplitView } from '../storeNav'
 import { runSearch, cancelSearch, toggleInspector } from '../storeOps'
 import { createFolder, createFile } from '../storeFiles'
 import { openPrompt } from '../prompt'
@@ -137,8 +139,7 @@ function cycleTheme() {
 }
 
 function toggleSplit() {
-  state.splitView = !state.splitView
-  import('../store').then((m) => m.persist())
+  toggleSplitView()
 }
 
 function newFolder() {
@@ -147,7 +148,7 @@ function newFolder() {
     label: 'Folder name',
     value: 'New Folder',
     confirmLabel: 'Create',
-    onSubmit: (name) => createFolder(state.cwd, name)
+    onSubmit: (name) => createFolder(activeCwd(), name)
   })
 }
 
@@ -157,7 +158,7 @@ function newFile() {
     label: 'File name',
     value: 'untitled.txt',
     confirmLabel: 'Create',
-    onSubmit: (name) => createFile(state.cwd, name, '')
+    onSubmit: (name) => createFile(activeCwd(), name, '')
   })
 }
 

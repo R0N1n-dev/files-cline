@@ -99,7 +99,15 @@ const digits = ref(2)
 const caseMode = ref('keep')
 const extension = ref('')
 
-const entries = computed(() => state.listing.entries.filter((e) => state.selection.includes(e.path)))
+const entries = computed(() => {
+  const list = state.activePane === 'secondary' && state.splitView
+    ? state.secondary.entries
+    : state.listing.entries
+  const selection = state.activePane === 'secondary' && state.splitView
+    ? state.secondary.selection
+    : state.selection
+  return list.filter((e) => selection.includes(e.path))
+})
 
 function splitName(name) {
   const dot = name.lastIndexOf('.')

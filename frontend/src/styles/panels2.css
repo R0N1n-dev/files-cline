@@ -37,6 +37,22 @@
 .palette-item:hover { background: var(--bg-hover); }
 .palette-item .hint { margin-left: auto; color: var(--text-faint); font-size: 11.5px; }
 
+.palette-item svg.vela-icon {
+  width: 17px;
+  height: 17px;
+  color: var(--text-dim);
+}
+
+.drag-shelf svg.vela-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.drag-card svg.vela-icon {
+  width: 18px;
+  height: 18px;
+}
+
 /* ------------------------------------------------------------- drag shelf */
 
 .drag-shelf {

@@ -157,6 +157,16 @@
   font-weight: 700;
 }
 
+.toast svg.vela-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.menu-item svg.vela-icon {
+  width: 15px;
+  height: 15px;
+}
+
 /* ------------------------------------------------------------- drop overlay */
 
 .drop-overlay {

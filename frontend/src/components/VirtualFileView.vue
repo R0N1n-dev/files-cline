@@ -1,15 +1,19 @@
 <template>
-  <div class="pane" :class="{ 'pane-secondary': secondary }">
+  <div
+    class="pane"
+    :class="{ 'pane-secondary': isSecondary, 'pane-active': isActivePane }"
+    @mousedown="setActivePane(pane)"
+  >
     <div class="view-toolbar">
       <slot name="toolbar" />
       <div class="spacer" />
-      <span v-if="!secondary" class="pill" :title="diskTitle">{{ diskLabel }}</span>
+      <span v-if="paneMeta.diskTotal" class="pill" :title="diskTitle">{{ diskLabel }}</span>
     </div>
 
     <div
       ref="scrollEl"
       class="view-scroll"
-      :tabindex="secondary ? -1 : 0"
+      tabindex="0"
       @scroll="onScroll"
       @mousedown="onMouseDown"
       @dblclick="onBlankDoubleClick"
@@ -117,7 +121,8 @@ import FileIcon from './FileIcon.vue'
 import { state, isSelected } from '../store'
 import {
   setSelection, toggleSelection, rangeSelect, selectOnly, clearSelection,
-  navigate, setSort, queueVisibleThumbnails
+  navigate, navigateSecondary, goUpSecondary, setActivePane, setSort,
+  queueVisibleThumbnails
 } from '../storeNav'
 import { formatSize, formatDate, relativeTime } from '../utils/format'
 import { activateEntry, renameEntry } from '../storeFiles'
@@ -125,12 +130,16 @@ import { handleDrop } from '../storeFiles2'
 import { quickLook } from '../storeOps'
 
 const props = defineProps({
-  secondary: { type: Boolean, default: false },
-  entries: { type: Array, default: null },
-  cwd: { type: String, default: '' }
+  /** Which pane this view drives: 'primary' or 'secondary' (split view). */
+  pane: { type: String, default: 'primary' }
 })
 
 const emit = defineEmits(['context-menu', 'selection-change'])
+
+const isSecondary = computed(() => props.pane === 'secondary')
+const isActivePane = computed(() =>
+  isSecondary.value ? state.activePane === 'secondary' : state.activePane === 'primary'
+)
 
 const scrollEl = ref(null)
 const scrollTop = ref(0)
@@ -141,11 +150,19 @@ const renameInputs = ref([])
 const dropTargetPath = ref('')
 const marquee = ref(null)
 
-const items = computed(() => props.entries || (state.searchMode ? state.searchResults : state.listing.entries))
-const viewMode = computed(() => (props.secondary ? 'grid' : state.viewMode))
+/** Directory metadata for this pane (primary uses the main listing). */
+const paneMeta = computed(() => (isSecondary.value ? state.secondary : state.listing))
+
+const items = computed(() => {
+  if (isSecondary.value) return state.secondary.entries
+  if (state.searchMode) return state.searchResults
+  return state.listing.entries
+})
+
+const viewMode = computed(() => (isSecondary.value ? 'grid' : state.viewMode))
 const iconSize = computed(() => state.iconSize)
-const loading = computed(() => state.loading)
-const dropActive = computed(() => state.dropActive && !props.secondary)
+const loading = computed(() => state.loading && !isSecondary.value)
+const dropActive = computed(() => state.dropActive && !isSecondary.value)
 
 const GAP = 4
 const PADDING = 12
@@ -240,17 +257,17 @@ onBeforeUnmount(() => {
 })
 
 const diskLabel = computed(() => {
-  const free = state.listing.diskFree
-  const total = state.listing.diskTotal
+  const free = paneMeta.value.diskFree
+  const total = paneMeta.value.diskTotal
   if (!total) return ''
-  const pct = Math.round(state.listing.diskUsedPercent || 0)
+  const pct = Math.round(paneMeta.value.diskUsedPercent || 0)
   return `${formatSize(free)} free · ${pct}% used`
 })
 
 const diskTitle = computed(() => {
-  const total = state.listing.diskTotal
+  const total = paneMeta.value.diskTotal
   if (!total) return ''
-  return `${formatSize(state.listing.diskFree)} free of ${formatSize(total)} on ${state.listing.mountPoint || '/'}`
+  return `${formatSize(paneMeta.value.diskFree)} free of ${formatSize(total)} on ${paneMeta.value.mountPoint || '/'}`
 })
 
 function badgeFor(entry) {
@@ -261,7 +278,7 @@ function badgeFor(entry) {
 
 function tileClass(entry) {
   return {
-    selected: isSelected(entry.path),
+    selected: isSelected(entry.path, props.pane),
     cut: state.clipboardCut && state.clipboardCut.includes(entry.path),
     'drop-target': dropTargetPath.value === entry.path
   }
@@ -315,14 +332,15 @@ function onMouseDown(e) {
   if (!onBlank) return
 
   scrollEl.value.focus({ preventScroll: true })
+  setActivePane(props.pane)
   const additive = e.ctrlKey || e.metaKey
-  if (!additive) clearSelection()
+  if (!additive) clearSelection(props.pane)
 
   marqueeState = {
     start: contentPoint(e),
     additive,
     toggle: additive,
-    base: additive ? [...state.selection] : []
+    base: additive ? [...readPaneSelection()] : []
   }
   marquee.value = { x: marqueeState.start.x, y: marqueeState.start.y, w: 0, h: 0 }
 
@@ -349,11 +367,11 @@ function onMarqueeMove(e) {
   if (marqueeState.toggle) {
     const set = new Set(marqueeState.base)
     hit.forEach((p) => (set.has(p) ? set.delete(p) : set.add(p)))
-    state.selection = [...set]
+    setSelection([...set], props.pane)
   } else {
-    state.selection = hit
+    setSelection(hit, props.pane)
   }
-  emit('selection-change', state.selection)
+  emit('selection-change', readPaneSelection())
 
   handleAutoScroll(e)
 }
@@ -407,22 +425,27 @@ const marqueeStyle = computed(() => {
 
 function onItemMouseDown(e, entry, index) {
   if (e.button !== 0) return
+  setActivePane(props.pane)
   if (e.ctrlKey || e.metaKey) {
-    toggleSelection(entry.path, index)
+    toggleSelection(entry.path, index, props.pane)
   } else if (e.shiftKey) {
-    rangeSelect(index)
-  } else if (!isSelected(entry.path)) {
-    selectOnly(entry.path, index)
+    rangeSelect(index, props.pane)
+  } else if (!isSelected(entry.path, props.pane)) {
+    selectOnly(entry.path, index, props.pane)
   } else {
-    state.lastAnchor = index
+    setPaneAnchor(index)
   }
-  emit('selection-change', state.selection)
+  emit('selection-change', readPaneSelection())
 }
 
 async function activate(entry) {
   if (renaming.value === entry.path) return
-  if (entry.isDir) await navigate(entry.path)
-  else await activateEntry(entry)
+  if (entry.isDir) {
+    if (isSecondary.value) await navigateSecondary(entry.path)
+    else await navigate(entry.path)
+    return
+  }
+  await activateEntry(entry)
 }
 
 function onBlankDoubleClick(e) {
@@ -430,17 +453,35 @@ function onBlankDoubleClick(e) {
 }
 
 async function goUpParent() {
-  const parent = state.listing.parentPath
-  if (parent) await navigate(parent)
+  const parent = paneMeta.value.parentPath
+  if (!parent) return
+  if (isSecondary.value) await goUpSecondary()
+  else await navigate(parent)
 }
 
 function onItemContextMenu(e, entry, index) {
-  if (!isSelected(entry.path)) selectOnly(entry.path, index)
+  setActivePane(props.pane)
+  if (!isSelected(entry.path, props.pane)) selectOnly(entry.path, index, props.pane)
   emit('context-menu', { x: e.clientX, y: e.clientY, entry })
 }
 
 function onBlankContextMenu(e) {
+  setActivePane(props.pane)
   emit('context-menu', { x: e.clientX, y: e.clientY, entry: null })
+}
+
+/** Current selection of this pane (used by the marquee and keyboard logic). */
+function readPaneSelection() {
+  return isSecondary.value ? state.secondary.selection : state.selection
+}
+
+function setPaneAnchor(index) {
+  if (isSecondary.value) state.secondary.lastAnchor = index
+  else state.lastAnchor = index
+}
+
+function readPaneAnchor() {
+  return isSecondary.value ? state.secondary.lastAnchor : state.lastAnchor
 }
 
 /* --------------------------------------------------------------- hit testing */
@@ -500,7 +541,7 @@ function readInternalDrag(e) {
 async function onDrop(e, folder) {
   state.dropActive = false
   const internal = readInternalDrag(e)
-  const destDir = folder && folder.isDir ? folder.path : (props.cwd || state.cwd)
+  const destDir = folder && folder.isDir ? folder.path : paneMeta.value.cwd
   const move = e.shiftKey
 
   if (internal && internal.paths) {
@@ -577,9 +618,10 @@ function cancelRename() {
 function moveFocus(delta) {
   const list = items.value
   if (!list.length) return
-  const current = state.selection.length ? list.findIndex((e) => e.path === state.selection[0]) : -1
+  const selection = readPaneSelection()
+  const current = selection.length ? list.findIndex((e) => e.path === selection[0]) : -1
   const next = Math.min(list.length - 1, Math.max(0, (current < 0 ? 0 : current) + delta))
-  selectOnly(list[next].path, next)
+  selectOnly(list[next].path, next, props.pane)
   scrollIntoView(next)
 }
 
@@ -593,61 +635,72 @@ function scrollIntoView(index) {
   }
 }
 
-async function onKeyDown(e) {
+/**
+ * Handles a key inside this pane. Returns true when the event was consumed, so
+ * the shell's global shortcut handler never double-fires the same action
+ * (e.g. Space opening and instantly closing Quick Look).
+ */
+async function handlePaneKey(e) {
   const cols = columns.value
   const step = viewMode.value === 'grid' ? cols : 1
+  const selection = readPaneSelection()
 
   switch (e.key) {
-    case 'ArrowDown':
-      e.preventDefault(); moveFocus(step); break
-    case 'ArrowUp':
-      e.preventDefault(); moveFocus(-step); break
-    case 'ArrowRight':
-      e.preventDefault(); moveFocus(1); break
-    case 'ArrowLeft':
-      e.preventDefault(); moveFocus(-1); break
+    case 'ArrowDown': moveFocus(step); return true
+    case 'ArrowUp': moveFocus(-step); return true
+    case 'ArrowRight': moveFocus(1); return true
+    case 'ArrowLeft': moveFocus(-1); return true
     case 'Home':
-      e.preventDefault(); if (items.value.length) { selectOnly(items.value[0].path, 0); scrollIntoView(0) } break
+      if (items.value.length) { selectOnly(items.value[0].path, 0, props.pane); scrollIntoView(0) }
+      return true
     case 'End':
-      e.preventDefault()
       if (items.value.length) {
         const last = items.value.length - 1
-        selectOnly(items.value[last].path, last); scrollIntoView(last)
+        selectOnly(items.value[last].path, last, props.pane)
+        scrollIntoView(last)
       }
-      break
-    case 'Enter':
-      if (state.selection.length) {
-        e.preventDefault()
-        const entry = items.value.find((x) => x.path === state.selection[0])
-        if (entry) await activate(entry)
-      }
-      break
+      return true
+    case 'Enter': {
+      const entry = items.value.find((x) => x.path === selection[0])
+      if (entry) await activate(entry)
+      return true
+    }
     case 'F2':
-      if (state.selection.length) { e.preventDefault(); startRename(state.selection[0]) }
-      break
+      if (selection.length) startRename(selection[0])
+      return true
     case ' ':
-      if (state.selection.length) { e.preventDefault(); await quickLook(state.selection[0]) }
-      break
+      if (selection.length) await quickLook(selection[0])
+      return true
     case 'Backspace':
-      e.preventDefault()
       await goUpParent()
-      break
-    case 'a':
-      if (e.ctrlKey || e.metaKey) { e.preventDefault(); setSelection(items.value.map((x) => x.path)) }
-      break
+      return true
     case 'Escape':
-      clearSelection()
-      break
+      clearSelection(props.pane)
+      return true
+    case 'a':
+    case 'A':
+      if (e.ctrlKey || e.metaKey) {
+        setSelection(items.value.map((x) => x.path), props.pane)
+        return true
+      }
+      return false
     default:
-      break
+      return false
   }
 }
 
-watch(() => state.listing.path, () => {
-  scrollEl.value && (scrollEl.value.scrollTop = 0)
+async function onKeyDown(e) {
+  if (await handlePaneKey(e)) {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+}
+
+watch(() => paneMeta.value.cwd, () => {
+  if (scrollEl.value) scrollEl.value.scrollTop = 0
   scrollTop.value = 0
   renaming.value = null
 })
 
-watch(() => items.value.length, () => queueVisibleThumbnails())
+watch(() => items.value.length, () => queueVisibleThumbnails(items.value))
 </script>
