@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -20,15 +21,20 @@ func (t *TrashManager) TrashItems(paths []string) (TrashTransaction, error) {
 	}
 
 	var failed []string
+	var nativeErr error
 	for _, p := range paths {
 		abs, err := filepath.Abs(ExpandPath(p))
 		if err != nil {
 			failed = append(failed, p)
+			nativeErr = err
 			continue
 		}
 		item, err := t.trashOne(abs)
 		if err != nil {
 			failed = append(failed, abs)
+			if nativeErr == nil {
+				nativeErr = err
+			}
 			continue
 		}
 		txn.Items = append(txn.Items, item)
@@ -41,7 +47,7 @@ func (t *TrashManager) TrashItems(paths []string) (TrashTransaction, error) {
 		gioTxn, err := t.trashWithGio(failed)
 		if err != nil {
 			if len(txn.Items) == 0 {
-				return txn, err
+				return txn, fmt.Errorf("cannot move to Trash: %w (per-mount trash unreachable, gio unavailable)", nativeErr)
 			}
 		} else {
 			txn.UsedGio = true
@@ -63,33 +69,59 @@ func (t *TrashManager) TrashItems(paths []string) (TrashTransaction, error) {
 	return txn, nil
 }
 
+// deviceOf returns the st_dev of a path (0 when unavailable).
+func deviceOf(path string) uint64 {
+	var st syscall.Stat_t
+	if err := syscall.Stat(path, &st); err != nil {
+		return 0
+	}
+	return uint64(st.Dev)
+}
+
+// sameFilesystem reports whether two paths live on the same mounted filesystem.
+// Mount points are compared first because stacked filesystems (overlayfs with
+// xino, btrfs subvolumes, fuse) can report different st_dev values for paths on
+// the same mount, which would otherwise break FreeDesktop trash selection.
+func sameFilesystem(a, b string) bool {
+	mpA, _ := FindMountPoint(a)
+	mpB, _ := FindMountPoint(b)
+	if mpA != "" && mpB != "" {
+		return mpA == mpB
+	}
+	devA, devB := deviceOf(a), deviceOf(b)
+	if devA == 0 || devB == 0 {
+		return true
+	}
+	return devA == devB
+}
+
 // trashOne performs a spec-compliant native trashing of a single absolute path.
+// Per the FreeDesktop spec, the home trash is used when the file lives on the
+// same filesystem as the home trash directory; otherwise a per-mount topdir
+// trash (.Trash/<uid> or .Trash-<uid>) is used so external drives work too.
 func (t *TrashManager) trashOne(absPath string) (TrashItem, error) {
 	info, err := os.Lstat(absPath)
 	if err != nil {
 		return TrashItem{}, err
 	}
 
-	homeMount, _ := FindMountPoint(mustHomeDir())
-	fileMount, _ := FindMountPoint(absPath)
-
 	trashDir := HomeTrashDir()
-	mountPoint := homeMount
+	if err := os.MkdirAll(filepath.Join(trashDir, "files"), 0700); err != nil {
+		return TrashItem{}, err
+	}
+	if err := os.MkdirAll(filepath.Join(trashDir, "info"), 0700); err != nil {
+		return TrashItem{}, err
+	}
+
+	mountPoint, _ := FindMountPoint(absPath)
 	isTopdir := false
 
-	if fileMount != homeMount {
+	if !sameFilesystem(trashDir, absPath) {
 		dir, mp, err := t.topdirTrashFor(absPath)
 		if err != nil {
 			return TrashItem{}, err
 		}
 		trashDir, mountPoint, isTopdir = dir, mp, true
-	} else {
-		if err := os.MkdirAll(filepath.Join(trashDir, "files"), 0700); err != nil {
-			return TrashItem{}, err
-		}
-		if err := os.MkdirAll(filepath.Join(trashDir, "info"), 0700); err != nil {
-			return TrashItem{}, err
-		}
 	}
 
 	base := filepath.Base(absPath)

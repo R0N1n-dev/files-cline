@@ -119,8 +119,7 @@ func ReadClipboard() (ClipboardPayload, error) {
 	for _, line := range strings.Split(data, "\n") {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "file://") || strings.HasPrefix(line, "/") {
-			p := strings.TrimPrefix(line, "file://")
-			out.Paths = append(out.Paths, percentDecode(p))
+			out.Paths = append(out.Paths, pathFromFileURI(line))
 		}
 	}
 	return out, nil
@@ -139,7 +138,7 @@ func parseURIList(data string) ClipboardPayload {
 			continue
 		}
 		if strings.HasPrefix(line, "file://") {
-			payload.Paths = append(payload.Paths, percentDecode(strings.TrimPrefix(line, "file://")))
+			payload.Paths = append(payload.Paths, pathFromFileURI(line))
 		}
 	}
 	return payload

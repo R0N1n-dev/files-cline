@@ -1,0 +1,156 @@
+import { state, toast, fail, upsertOp } from './store'
+import { refresh } from './storeNav'
+import { backend } from './api'
+import { targetPaths } from './storeFiles'
+
+/* ------------------------------------------------------------------ archive */
+
+export async function compressSelection(destArchive) {
+  const paths = targetPaths()
+  if (!paths.length) return
+  try {
+    const dest = await backend.CreateArchive(paths, destArchive)
+    toast(`Created ${dest.split('/').pop()}`, 'success')
+    await refresh()
+  } catch (err) {
+    fail(err)
+  }
+}
+
+export async function extractSelection(destDir) {
+  const archives = targetPaths().filter((p) => /\.(zip|tar|tar\.gz|tgz)$/i.test(p))
+  if (!archives.length) {
+    toast('Select a .zip, .tar, or .tar.gz archive first', 'error')
+    return
+  }
+  try {
+    const id = await backend.ExtractArchive(archives, destDir || state.cwd)
+    toast('Extracting — you can cancel it from the operations ring', 'info')
+    const ops = await backend.ListOperations()
+    ;(ops || []).forEach(upsertOp)
+    return id
+  } catch (err) {
+    fail(err)
+  }
+}
+
+/* --------------------------------------------------------------------- drop */
+
+export async function handleDrop(sources, destDir, move = false) {
+  if (!sources || !sources.length) return
+  try {
+    await backend.HandleDrop(sources, destDir || state.cwd, move)
+    toast(`${move ? 'Moving' : 'Copying'} ${sources.length} dropped item(s)…`, 'info')
+  } catch (err) {
+    fail(err)
+  }
+}
+
+/* ---------------------------------------------------------------- clipboard */
+
+const internalClipboard = { paths: [], cut: false }
+
+export async function copySelection(cut = false) {
+  const paths = targetPaths()
+  if (!paths.length) return
+  internalClipboard.paths = paths
+  internalClipboard.cut = cut
+  try {
+    await backend.CopyToClipboard(paths, cut)
+    toast(`${cut ? 'Cut' : 'Copied'} ${paths.length} item(s) — paste into any Linux app`, 'success')
+  } catch {
+    toast(`${cut ? 'Cut' : 'Copied'} ${paths.length} item(s) (internal clipboard)`, 'info')
+  }
+}
+
+export async function pasteInto(destDir) {
+  const target = destDir || state.cwd
+  let paths = internalClipboard.paths
+  let cut = internalClipboard.cut
+  let fromSystem = false
+
+  try {
+    const payload = await backend.ReadClipboard()
+    if (payload && payload.paths && payload.paths.length) {
+      paths = payload.paths
+      cut = !!payload.cut
+      fromSystem = true
+    }
+  } catch {
+    /* system clipboard unavailable — use the internal one */
+  }
+
+  if (!paths || !paths.length) {
+    toast('Clipboard is empty', 'info')
+    return
+  }
+
+  try {
+    if (cut) {
+      await backend.Move(paths, target, state.conflictMode)
+      internalClipboard.paths = []
+    } else {
+      await backend.Copy(paths, target, state.conflictMode)
+    }
+    const origin = fromSystem ? ' from the system clipboard' : ''
+    toast(`${cut ? 'Moving' : 'Copying'} ${paths.length} item(s)${origin}…`, 'info')
+  } catch (err) {
+    fail(err)
+  }
+}
+
+/* ------------------------------------------------------ native integrations */
+
+export async function showInNativeFileManager(paths) {
+  try {
+    await backend.ShowInNativeFileManager(targetPaths(paths))
+    toast('Opened in the native file manager', 'success')
+  } catch (err) {
+    fail(err)
+  }
+}
+
+export async function openTerminal(dir) {
+  try {
+    await backend.OpenTerminal(dir || state.cwd)
+  } catch (err) {
+    fail(err)
+  }
+}
+
+export async function stageOutboundDrag() {
+  const paths = targetPaths()
+  if (!paths.length) return
+  state.dragShelf = paths
+  try {
+    await backend.StartOutboundDrag(paths)
+    toast('Drag the floating card into another app, or use “Copy for Linux apps”', 'info')
+  } catch {
+    toast('Native drag source unavailable — copied to the clipboard instead', 'info')
+    await copySelection(false)
+  }
+}
+
+export function clearDragShelf() {
+  state.dragShelf = []
+}
+
+export async function addBookmark(path) {
+  try {
+    await backend.AddBookmark(path || state.cwd)
+    state.sidebar = await backend.GetSidebar()
+    toast('Added to bookmarks', 'success')
+  } catch (err) {
+    fail(err)
+  }
+}
+
+export async function removeBookmark(path) {
+  try {
+    await backend.RemoveBookmark(path)
+    state.sidebar = await backend.GetSidebar()
+    toast('Bookmark removed', 'info')
+  } catch (err) {
+    fail(err)
+  }
+}

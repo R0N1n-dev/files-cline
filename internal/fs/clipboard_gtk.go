@@ -85,22 +85,17 @@ gi.require_version('Gtk', '3.0')
 gi.require_version('Gdk', '3.0')
 from gi.repository import Gtk, Gdk, GLib
 
-paths = sys.argv[1:]
-if not paths:
+uris = sys.argv[1:]
+if not uris:
     sys.exit(1)
-
-uris = ['file://' + p for p in paths]
 
 def on_drag_data_get(widget, ctx, selection, info, time):
     selection.set_uris(uris)
 
-def on_drag_begin(widget, ctx):
-    pass
-
 window = Gtk.Window(type=Gtk.WindowType.TOPLEVEL)
 window.set_title('Drag files out')
 window.set_default_size(320, 120)
-label = Gtk.Label(label='Drag the card below into another app\n(%d item(s))' % len(paths))
+label = Gtk.Label(label='Drag the card below into another app\n(%d item(s))' % len(uris))
 window.add(label)
 window.set_keep_above(True)
 window.show_all()
@@ -108,7 +103,6 @@ window.show_all()
 label.drag_source_set(Gdk.ModifierType.BUTTON1_MASK, [], Gdk.DragAction.COPY)
 label.drag_source_add_uri_targets()
 label.connect('drag-data-get', on_drag_data_get)
-label.connect('drag-begin', on_drag_begin)
 window.connect('destroy', Gtk.main_quit)
 GLib.timeout_add_seconds(300, Gtk.main_quit)
 Gtk.main()
@@ -145,7 +139,7 @@ func StartNativeDrag(paths []string) error {
 	if err := check.Run(); err != nil {
 		return os.ErrNotExist
 	}
-	args := append([]string{"-c", gtkDragScript()}, abs...)
+	args := append([]string{"-c", gtkDragScript()}, FileURIs(abs)...)
 	cmd := exec.Command(python, args...)
 	cmd.Env = os.Environ()
 	if err := cmd.Start(); err != nil {

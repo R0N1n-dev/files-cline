@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -97,10 +98,10 @@ func (t *TrashManager) topdirTrashFor(absPath string) (string, string, error) {
 
 	dir := filepath.Join(mountPoint, ".Trash-"+uid)
 	if err := os.MkdirAll(filepath.Join(dir, "files"), 0700); err != nil {
-		return "", mountPoint, err
+		return "", mountPoint, fmt.Errorf("no writable trash on %s: %w", mountPoint, err)
 	}
 	if err := os.MkdirAll(filepath.Join(dir, "info"), 0700); err != nil {
-		return "", mountPoint, err
+		return "", mountPoint, fmt.Errorf("no writable trash on %s: %w", mountPoint, err)
 	}
 	return dir, mountPoint, nil
 }

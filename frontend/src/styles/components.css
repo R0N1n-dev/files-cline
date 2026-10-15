@@ -1,0 +1,251 @@
+/* Vela Files — shell layout and core controls. */
+
+.shell {
+  display: grid;
+  grid-template-rows: var(--header-height) 1fr;
+  height: 100vh;
+  background: var(--bg);
+}
+
+.shell-body {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  min-height: 0;
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-view);
+}
+
+.pane + .pane {
+  border-left: 1px solid var(--border);
+}
+
+/* ------------------------------------------------------------------ header */
+
+.headerbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border);
+}
+
+.headerbar .spacer {
+  flex: 1;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  transition: background var(--transition), color var(--transition);
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.icon-btn:active:not(:disabled) {
+  background: var(--bg-active);
+}
+
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.icon-btn.active {
+  background: var(--bg-selected);
+  color: var(--accent);
+}
+
+.icon-btn svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ------------------------------------------------------- path / breadcrumbs */
+
+.pathbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 190px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crumb:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.crumb.current {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.crumb-sep {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.pathbar input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0 6px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+.pathbar input:focus {
+  box-shadow: none;
+}
+
+/* ----------------------------------------------------------- search / pills */
+
+.searchbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 190px;
+  height: 32px;
+  padding: 0 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+}
+
+.searchbox input {
+  border: none;
+  background: transparent;
+  padding: 0;
+  width: 100%;
+}
+
+.searchbox input:focus {
+  box-shadow: none;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-sunken);
+  color: var(--text-dim);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.pill.warn {
+  background: rgba(229, 165, 10, 0.22);
+  color: var(--text);
+}
+
+.pill.danger {
+  background: rgba(224, 27, 36, 0.2);
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 600;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.btn:hover {
+  background: var(--bg-hover);
+}
+
+.btn.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-text);
+}
+
+.btn.primary:hover {
+  background: var(--accent-hover);
+}
+
+.btn.danger {
+  background: var(--error);
+  border-color: transparent;
+  color: #fff;
+}
+
+.btn.subtle {
+  background: transparent;
+  border-color: transparent;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  background: var(--bg-sunken);
+  border-radius: var(--radius-sm);
+}
+
+.segmented button {
+  padding: 5px 10px;
+  border-radius: 5px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.segmented button.active {
+  background: var(--bg-elevated);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}

@@ -54,6 +54,27 @@ func uniqueDestination(destDir, baseName string) string {
 	return filepath.Join(destDir, fmt.Sprintf("%s-copy%s", stem, ext))
 }
 
+// revertEntries undoes recorded filesystem actions in reverse order.
+func revertEntries(entries []UndoEntry) error {
+	for i := len(entries) - 1; i >= 0; i-- {
+		e := entries[i]
+		switch {
+		case e.MovedFrom != "":
+			if _, err := os.Lstat(e.MovedTo); err == nil {
+				_ = os.MkdirAll(filepath.Dir(e.MovedFrom), 0755)
+				if err := os.Rename(e.MovedTo, e.MovedFrom); err != nil {
+					return fmt.Errorf("undo move failed: %w", err)
+				}
+			}
+		case e.CreatedPath != "":
+			if err := os.RemoveAll(e.CreatedPath); err != nil {
+				return fmt.Errorf("undo copy failed: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
 func fileSizeOf(path string) int64 {
 	if info, err := os.Stat(path); err == nil {
 		return info.Size()

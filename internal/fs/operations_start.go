@@ -44,13 +44,21 @@ func (m *OperationsManager) startTransfer(kind string, sources []string, destDir
 	go func() {
 		runErr := m.runTransfer(op)
 		op.mu.Lock()
+		cancelled := op.State == StateCancelling || op.State == StateCancelled || op.ctx.Err() != nil
+		entries := append([]UndoEntry{}, op.Undo...)
 		op.FinishedAt = time.Now()
-		op.SpeedBps = 0
-		op.ETASeconds = 0
+		op.SpeedBps, op.ETASeconds = 0, 0
 		switch {
-		case runErr != nil && errors.Is(runErr, ErrCancelled):
+		case cancelled:
+			// A cancel that landed at the finish line still wins: roll back output.
 			op.State = StateCancelled
 			op.Message = "Cancelled — partial files removed"
+			op.CanUndo = false
+			op.Undo = nil
+			op.mu.Unlock()
+			_ = revertEntries(entries)
+			m.emitEvent("op:done", snapshot(op))
+			return
 		case runErr != nil:
 			op.State = StateError
 			op.Error = runErr.Error()
@@ -67,7 +75,7 @@ func (m *OperationsManager) startTransfer(kind string, sources []string, destDir
 				op.Message = fmt.Sprintf("Copied %d item(s)", op.ItemsDone)
 			}
 		}
-		final := snapshot(op)
+		final := snapshotLocked(op)
 		op.mu.Unlock()
 		m.emitEvent("op:done", final)
 	}()
@@ -152,21 +160,8 @@ func (m *OperationsManager) Undo(id string) error {
 		return errors.New("this operation cannot be undone")
 	}
 
-	for i := len(entries) - 1; i >= 0; i-- {
-		e := entries[i]
-		switch {
-		case e.MovedFrom != "":
-			if _, err := os.Lstat(e.MovedTo); err == nil {
-				_ = os.MkdirAll(filepath.Dir(e.MovedFrom), 0755)
-				if err := os.Rename(e.MovedTo, e.MovedFrom); err != nil {
-					return fmt.Errorf("undo move failed: %w", err)
-				}
-			}
-		case e.CreatedPath != "":
-			if err := os.RemoveAll(e.CreatedPath); err != nil {
-				return fmt.Errorf("undo copy failed: %w", err)
-			}
-		}
+	if err := revertEntries(entries); err != nil {
+		return err
 	}
 
 	op.mu.Lock()

@@ -74,9 +74,15 @@ func (m *OperationsManager) Get(id string) (Operation, bool) {
 	return snapshot(op), true
 }
 
+// snapshot returns a lock-protected copy of the operation for JSON transport.
 func snapshot(op *Operation) Operation {
 	op.mu.Lock()
 	defer op.mu.Unlock()
+	return snapshotLocked(op)
+}
+
+// snapshotLocked copies the operation state; the caller must already hold op.mu.
+func snapshotLocked(op *Operation) Operation {
 	return Operation{
 		ID: op.ID, Kind: op.Kind, State: op.State,
 		Sources: op.Sources, DestDir: op.DestDir, ConflictMode: op.ConflictMode,
@@ -98,11 +104,13 @@ func (m *OperationsManager) Cancel(id string) error {
 		return fmt.Errorf("operation %q not found", id)
 	}
 	op.mu.Lock()
-	if op.State == StateCompleted || op.State == StateCancelled || op.State == StateError {
+	if op.State == StateCompleted || op.State == StateCancelled || op.State == StateError || op.State == StateCancelling {
 		op.mu.Unlock()
-		return fmt.Errorf("operation %q already finished", id)
+		return fmt.Errorf("operation %q already finishing or finished", id)
 	}
-	op.State = StateCancelled
+	// Mark as cancelling: the worker owns the terminal state so cleanup
+	// (removing partial files) always completes before the UI reports "cancelled".
+	op.State = StateCancelling
 	cancel := op.cancel
 	op.mu.Unlock()
 

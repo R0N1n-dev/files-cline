@@ -18,11 +18,12 @@ const (
 
 // Operation states.
 const (
-	StateRunning   = "running"
-	StatePaused    = "paused"
-	StateCancelled = "cancelled"
-	StateCompleted = "completed"
-	StateError     = "error"
+	StateRunning    = "running"
+	StatePaused     = "paused"
+	StateCancelling = "cancelling"
+	StateCancelled  = "cancelled"
+	StateCompleted  = "completed"
+	StateError      = "error"
 )
 
 // Conflict resolution policies.

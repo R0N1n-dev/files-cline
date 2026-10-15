@@ -3,7 +3,6 @@ package fs
 import (
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"syscall"
 )
@@ -38,7 +37,7 @@ func BuildExecArgs(execLine string, paths []string) []string {
 	fields := splitExecLine(execLine)
 	uris := make([]string, 0, len(paths))
 	for _, p := range paths {
-		uris = append(uris, "file://"+escapeURIPath(p))
+		uris = append(uris, FileURI(p))
 	}
 
 	var out []string
@@ -104,14 +103,6 @@ func splitExecLine(line string) []string {
 		tokens = append(tokens, sb.String())
 	}
 	return tokens
-}
-
-func escapeURIPath(p string) string {
-	abs, err := filepath.Abs(ExpandPath(p))
-	if err != nil {
-		abs = p
-	}
-	return percentEncodePath(abs)
 }
 
 func execError(tool string, out []byte, err error) error {

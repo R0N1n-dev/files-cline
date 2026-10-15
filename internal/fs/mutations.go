@@ -168,6 +168,9 @@ func SearchDirectory(ctx context.Context, rootPath, query string, showHidden boo
 	if walkErr != nil && !errors.Is(walkErr, io.EOF) && !errors.Is(walkErr, context.Canceled) {
 		return results, walkErr
 	}
+	if ctx.Err() != nil {
+		return results, ctx.Err()
+	}
 	SortEntries(results, "name", false)
 	return results, nil
 }

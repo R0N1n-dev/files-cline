@@ -1,0 +1,309 @@
+/* Vela Files — inspector, sidebar, operations ring. */
+
+.inspector {
+  width: 320px;
+  flex: none;
+  border-left: 1px solid var(--border);
+  background: var(--bg-sidebar);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.inspector-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+}
+
+.inspector-body {
+  padding: 12px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.inspector-preview {
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: var(--thumb-bg);
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 4px 10px;
+  font-size: 12.5px;
+}
+
+.kv dt { color: var(--text-faint); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+
+.badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-selected);
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+pre.preview {
+  margin: 0;
+  padding: 10px;
+  max-height: 300px;
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+
+/* ------------------------------------------------------------------ sidebar */
+
+.sidebar {
+  width: var(--sidebar-width);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 8px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.sidebar.collapsed {
+  width: 52px;
+  align-items: center;
+  padding: 10px 6px;
+}
+
+.sidebar-section {
+  padding: 10px 10px 4px;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.place {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-align: left;
+  transition: background var(--transition);
+}
+
+.place:hover { background: var(--bg-hover); }
+
+.place.active {
+  background: var(--bg-selected);
+  font-weight: 600;
+}
+
+.place svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+.place .label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.place .count {
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.volume {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.volume:hover { background: var(--bg-hover); }
+
+.volume-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.volume-head .label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.volume-head .free {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.meter {
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-sunken);
+  overflow: hidden;
+}
+
+.meter > span {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+.meter.warn > span { background: var(--warning); }
+.meter.danger > span { background: var(--error); }
+
+/* --------------------------------------------------------- operations ring */
+
+.op-ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.op-ring svg.track,
+.op-ring svg.bar {
+  position: absolute;
+  inset: 0;
+  width: 32px;
+  height: 32px;
+  transform: rotate(-90deg);
+}
+
+.op-ring svg.track circle {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 3;
+}
+
+.op-ring svg.bar circle {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 160ms linear;
+}
+
+.op-ring .pct {
+  position: relative;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.op-popover {
+  width: 400px;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.op-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  margin: 4px 0;
+}
+
+.op-card .title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.op-card .title .kind {
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-selected);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.op-card .bar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-sunken);
+  overflow: hidden;
+}
+
+.op-card .bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 160ms linear;
+}
+
+.op-card .meta {
+  display: flex;
+  gap: 10px;
+  color: var(--text-faint);
+  font-size: 11.5px;
+}
+
+.op-card .file {
+  color: var(--text-dim);
+  font-size: 11.5px;
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.op-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}

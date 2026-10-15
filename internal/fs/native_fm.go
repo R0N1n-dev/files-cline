@@ -37,7 +37,7 @@ func OpenInNativeFileManager(paths []string) error {
 
 	uris := make([]string, 0, len(absPaths))
 	for _, p := range absPaths {
-		uris = append(uris, "file://"+percentEncodePath(p))
+		uris = append(uris, FileURI(p))
 	}
 
 	// Preferred: D-Bus ShowItems (highlights the exact files).
@@ -103,7 +103,7 @@ func CopyPathsToClipboard(paths []string, cut bool) error {
 		if err != nil {
 			continue
 		}
-		uris = append(uris, "file://"+percentEncodePath(abs))
+		uris = append(uris, FileURI(abs))
 	}
 	if len(uris) == 0 {
 		return os.ErrNotExist
